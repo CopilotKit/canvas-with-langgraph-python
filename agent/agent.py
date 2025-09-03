@@ -34,6 +34,8 @@ class AgentState(CopilotKitState):
     planSteps: List[Dict[str, Any]] = []
     currentStepIndex: int = -1
     planStatus: str = ""
+    # Optional quotas/budgets for creation set by the agent before execution
+    creationTargets: Dict[str, Any] = {}
 def summarize_items_for_prompt(state: AgentState) -> str:
     try:
         items = state.get("items", []) or []
@@ -102,6 +104,21 @@ def complete_plan():
     """
     return {"completed": True}
 
+@tool
+def set_creation_targets(targets: Dict[str, Any]):
+    """
+    Set creation targets/quotas for the current plan.
+    Example structure:
+    {
+      "items": {"project": 1, "entity": 1, "note": 1, "chart": 1},
+      "sub": {
+        "project": {"checklist": 2, "minChecked": 1},
+        "chart": {"metrics": 3}
+      }
+    }
+    """
+    return {"ok": True, "targets": targets}
+
 # @tool
 # def your_tool_here(your_arg: str):
 #     """Your tool description here."""
@@ -113,6 +130,7 @@ backend_tools = [
     set_plan,
     update_plan_progress,
     complete_plan,
+    set_creation_targets,
 ]
 
 # Extract tool names from backend_tools for comparison
@@ -309,6 +327,9 @@ async def chat_node(state: AgentState, config: RunnableConfig) -> Command[Litera
             "- If asked to create a new project, entity, note, or chart, call createItem with type='<TYPE>' immediately (e.g., 'chart').\n"
             "- If also asked to fill values randomly or with placeholders, populate sensible defaults consistent with FIELD SCHEMA and, for projects/charts, add up to 2 checklist/metric entries using the relevant tools.\n"
             "- When asked to 'add a description' or similar during creation, set the card subtitle via setItemSubtitleOrDescription (do not use data.field1).\n"
+            "- Before execution, set exact creation targets using set_creation_targets (e.g., items: {project:1, entity:1, note:1, chart:1}, sub: {project:{checklist:2, minChecked:1}, chart:{metrics:3}}). Respect these exact quotas.\n"
+            "- Never create more items or sub-items than the targets. If a retry is needed, update/repair the existing item rather than creating a new one.\n"
+            "- To compute remaining quotas, read AgentState.creationTargets and current items; stop creating when the target is reached.\n"
             "STRICT GROUNDING RULES:\n"
             "1) ONLY use globalTitle, globalDescription, and itemsState as the source of truth.\n"
             "   Ignore chat history, prior messages, and assumptions.\n"

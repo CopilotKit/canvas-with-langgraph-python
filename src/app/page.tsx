@@ -673,6 +673,23 @@ export default function CopilotKitPage() {
         data: defaultDataFor(t),
       };
       const nextItems = [...items, item];
+      // If there are creation targets in state, enforce max by type
+      const targets = (base as any)?.creationTargets as Record<string, any> | undefined;
+      if (targets && targets.items && typeof targets.items === "object") {
+        const cap = Number(targets.items[t] ?? Number.POSITIVE_INFINITY);
+        if (Number.isFinite(cap)) {
+          const ofType = nextItems.filter(it => it.type === t);
+          if (ofType.length > cap) {
+            // drop the newest over-cap additions
+            let toDrop = ofType.length - cap;
+            const dedupReversed = [...nextItems].reverse().filter(it => {
+              if (toDrop > 0 && it.type === t) { toDrop -= 1; return false; }
+              return true;
+            }).reverse();
+            return { ...base, items: dedupReversed, itemsCreated: nextNumber, lastAction: `created:${createdId}` } as AgentState;
+          }
+        }
+      }
       // clamp to one per type when plan is active
       const planActive = String(base?.planStatus ?? "") === "in_progress";
       let deduped = nextItems;
@@ -935,6 +952,13 @@ export default function CopilotKitPage() {
       if (recent && recent.text === norm && now - recent.ts < 800) {
         return recent.id;
       }
+      // Enforce optional quotas
+      const quotas = (state as any)?.creationTargets as Record<string, any> | undefined;
+      if (quotas && quotas.sub && quotas.sub.project && Number.isFinite(quotas.sub.project.checklist)) {
+        const project = (state?.items ?? initialState.items).find((it) => it.id === itemId && it.type === "project");
+        const currLen = project ? ((project.data as any)?.field4 ?? []).length : 0;
+        if (currLen >= quotas.sub.project.checklist) return "";
+      }
       let createdId = "";
       updateItemData(itemId, (prev) => {
         const { next, createdId: id } = projectAddField4Item(prev as ProjectData, text);
@@ -1102,6 +1126,13 @@ export default function CopilotKitPage() {
       const valKey: number | "" = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : "";
       if (recent && recent.label === normLabel && recent.value === valKey && now - recent.ts < 800) {
         return recent.id;
+      }
+      // Enforce optional quotas
+      const quotas = (state as any)?.creationTargets as Record<string, any> | undefined;
+      if (quotas && quotas.sub && quotas.sub.chart && Number.isFinite(quotas.sub.chart.metrics)) {
+        const item = (state?.items ?? initialState.items).find((it) => it.id === itemId && it.type === "chart");
+        const currLen = item ? ((item.data as any)?.field1 ?? []).length : 0;
+        if (currLen >= quotas.sub.chart.metrics) return "";
       }
       let createdId = "";
       updateItemData(itemId, (prev) => {
