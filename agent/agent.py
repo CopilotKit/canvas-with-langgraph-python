@@ -353,6 +353,78 @@ async def chat_node(state: AgentState, config: RunnableConfig) -> Command[Litera
         )
     )
 
+    # Preflight: infer a plan and creation targets from the latest user request if none exist
+    plan_updates: Dict[str, Any] = {}
+    try:
+        last_user = next((m for m in reversed(state["messages"]) if getattr(m, "type", "") == "human"), None)
+        existing_steps = state.get("planSteps", []) or []
+        existing_status = state.get("planStatus", "")
+        if last_user and not existing_steps:
+            import re
+            text = (last_user.content or "").lower()
+            wants_project = bool(re.search(r"\bproject\b", text))
+            wants_entity = bool(re.search(r"\bentity\b", text))
+            wants_note = bool(re.search(r"\bnote\b", text))
+            wants_chart = bool(re.search(r"\bchart\b", text))
+
+            steps: list[dict[str, Any]] = []
+            targets_items: Dict[str, int] = {}
+            targets_sub: Dict[str, Any] = {}
+
+            if wants_project:
+                steps.append({"title": "Create a project card with random details and checklist items", "status": "pending"})
+                targets_items["project"] = targets_items.get("project", 0) + 1
+                # detect 'couple' => 2
+                check_ct = 2 if re.search(r"\bcouple\b", text) else 0
+                if check_ct == 0:
+                    m = re.search(r"(\b\d+)\s+checklist", text)
+                    if m:
+                        try:
+                            check_ct = max(0, int(m.group(1)))
+                        except Exception:
+                            check_ct = 0
+                if check_ct:
+                    targets_sub.setdefault("project", {})["checklist"] = check_ct
+                # at least one checked
+                if re.search(r"at\s+least\s+one\s+(?:of\s+the\s+)?checklist.*checked", text):
+                    targets_sub.setdefault("project", {})["minChecked"] = 1
+
+            if wants_entity:
+                steps.append({"title": "Create an entity card with random details and select tags", "status": "pending"})
+                targets_items["entity"] = targets_items.get("entity", 0) + 1
+                if re.search(r"at\s+least\s+one\s+tag", text):
+                    targets_sub.setdefault("entity", {})["tagsMin"] = 1
+
+            if wants_note:
+                steps.append({"title": "Create a note card with random content", "status": "pending"})
+                targets_items["note"] = targets_items.get("note", 0) + 1
+
+            if wants_chart:
+                steps.append({"title": "Create a chart card with random metrics", "status": "pending"})
+                targets_items["chart"] = targets_items.get("chart", 0) + 1
+                met_ct = 0
+                m3 = re.search(r"\b(\d+)\s+metrics?\b", text)
+                if m3:
+                    try:
+                        met_ct = max(0, int(m3.group(1)))
+                    except Exception:
+                        met_ct = 0
+                if met_ct == 0 and re.search(r"\bthree\s+metrics\b", text):
+                    met_ct = 3
+                if met_ct:
+                    targets_sub.setdefault("chart", {})["metrics"] = met_ct
+
+            if len(steps) >= 2:
+                # Initialize predictive plan so UI shows tracker immediately
+                steps[0]["status"] = "in_progress"
+                plan_updates["planSteps"] = steps
+                plan_updates["currentStepIndex"] = 0
+                plan_updates["planStatus"] = "in_progress"
+                # Seed creation targets
+                plan_updates["creationTargets"] = {"items": targets_items, "sub": targets_sub}
+    except Exception:
+        pass
+
     # 4. Run the model to generate a response
     # If the user asked to modify an item but did not specify which, interrupt to choose
     try:
@@ -402,9 +474,9 @@ async def chat_node(state: AgentState, config: RunnableConfig) -> Command[Litera
     # Predictive plan state updates based on imminent tool calls (for UI rendering)
     try:
         tool_calls = getattr(response, "tool_calls", []) or []
-        predicted_plan_steps = plan_steps.copy()
-        predicted_current_index = current_step_index
-        predicted_plan_status = plan_status
+        predicted_plan_steps = plan_updates.get("planSteps", plan_steps.copy())
+        predicted_current_index = plan_updates.get("currentStepIndex", current_step_index)
+        predicted_plan_status = plan_updates.get("planStatus", plan_status)
         for tc in tool_calls:
             name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
             args = tc.get("args") if isinstance(tc, dict) else getattr(tc, "args", {})
