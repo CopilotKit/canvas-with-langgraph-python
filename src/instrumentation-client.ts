@@ -1,0 +1,1 @@
+import "scroll-timeline-polyfill/src/index.js";
