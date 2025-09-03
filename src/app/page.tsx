@@ -300,6 +300,42 @@ export default function CopilotKitPage() {
   const planStepsMemo = (state?.planSteps ?? initialState.planSteps);
   const planStatusMemo = state?.planStatus ?? initialState.planStatus;
   const currentStepIndexMemo = typeof state?.currentStepIndex === "number" ? state.currentStepIndex : initialState.currentStepIndex;
+  const prevRunningRef = useRef<boolean>(running);
+  const finalSummaryEmittedRef = useRef<string | null>(null);
+  const planClearedRef = useRef<boolean>(false);
+
+  // Clear plan fields shortly after completion/failure/stopped to allow new chats/plans
+  useEffect(() => {
+    const status = String(state?.planStatus ?? "");
+    if ((status === "completed" || status === "failed" || status === "stopped") && !planClearedRef.current) {
+      const timer = window.setTimeout(() => {
+        setState((prev) => ({
+          ...(prev ?? initialState),
+          planSteps: [],
+          currentStepIndex: -1,
+          planStatus: "",
+        }));
+        planClearedRef.current = true;
+      }, 800);
+      return () => window.clearTimeout(timer);
+    }
+    if (status === "in_progress" || status === "") {
+      planClearedRef.current = false;
+      finalSummaryEmittedRef.current = null;
+    }
+  }, [state?.planStatus, state?.planSteps?.length]);
+
+  // If user stops (running goes from true to false) while plan is in progress, mark as stopped
+  useEffect(() => {
+    const prev = prevRunningRef.current;
+    if (prev && !running) {
+      const status = String(state?.planStatus ?? "");
+      if (status === "in_progress") {
+        setState((prevState) => ({ ...(prevState ?? initialState), planStatus: "stopped" }));
+      }
+    }
+    prevRunningRef.current = running;
+  }, [running, state?.planStatus, setState]);
 
   // One-time final summary renderer in chat when plan completes or fails
   useCoAgentStateRender<AgentState>({
@@ -311,6 +347,9 @@ export default function CopilotKitPage() {
       if (!Array.isArray(steps) || steps.length === 0) return null;
       if (status !== "completed" && status !== "failed") return null;
       const count = steps.length;
+      const sig = `${status}|${count}|${steps.map((s) => `${s.title}:${s.status}`).join("|")}`;
+      if (finalSummaryEmittedRef.current === sig) return null;
+      finalSummaryEmittedRef.current = sig;
       return (
         <div className="my-2 w-full">
           <Accordion type="single" collapsible defaultValue="done">

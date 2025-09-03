@@ -564,6 +564,8 @@ async def chat_node(state: AgentState, config: RunnableConfig) -> Command[Litera
     # Only show chat messages when not actively in progress; always deliver frontend tool calls
     currently_in_progress = (plan_updates.get("planStatus", plan_status) == "in_progress")
     final_messages = [*(state.get("messages", []) or []), response] if (has_frontend_tool_calls or not currently_in_progress) else (state.get("messages", []) or [])
+    # Detect stopped status from client-side (optional: treat as finished)
+    finished_like = plan_updates.get("planStatus") in ("completed", "failed") or (state.get("planStatus", "") == "stopped")
     return Command(
         goto=END,
         update={
@@ -574,9 +576,10 @@ async def chat_node(state: AgentState, config: RunnableConfig) -> Command[Litera
             "globalDescription": state.get("globalDescription", ""),
             "itemsCreated": state.get("itemsCreated", 0),
             "lastAction": state.get("lastAction", ""),
-            "planSteps": state.get("planSteps", []),
-            "currentStepIndex": state.get("currentStepIndex", -1),
-            "planStatus": state.get("planStatus", ""),
+            # If plan finished or was stopped, clear plan state to allow new chats/plans immediately
+            "planSteps": finished_like and [] or state.get("planSteps", []),
+            "currentStepIndex": finished_like and -1 or state.get("currentStepIndex", -1),
+            "planStatus": finished_like and "" or state.get("planStatus", ""),
             **plan_updates,
             "__last_tool_guidance": None,
         }
