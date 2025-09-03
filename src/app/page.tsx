@@ -2,14 +2,13 @@
 
 import { useCoAgent, useCopilotAction, useCoAgentStateRender, useCopilotAdditionalInstructions, useLangGraphInterrupt } from "@copilotkit/react-core";
 import { CopilotKitCSSProperties, CopilotChat, CopilotPopup, useChatContext, HeaderProps } from "@copilotkit/react-ui";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import type React from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Plus, X } from "lucide-react"
 import ShikiHighlighter from "react-shiki/web";
-import { motion, useScroll, useTransform, useMotionValueEvent } from "motion/react";
 import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -236,22 +235,9 @@ export default function CopilotKitPage() {
 
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const [showJsonView, setShowJsonView] = useState<boolean>(false);
-  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
-  const { scrollY } = useScroll({ container: scrollAreaRef });
-  const headerScrollThreshold = 32;
-  const headerOpacity = useTransform(scrollY, [0, headerScrollThreshold], [1, 0]);
-  const [headerDisabled, setHeaderDisabled] = useState<boolean>(false);
-  const titleInputRef = useRef<HTMLInputElement | null>(null);
-  const descTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  
 
-  useMotionValueEvent(scrollY, "change", (y) => {
-    const disable = y >= headerScrollThreshold;
-    setHeaderDisabled(disable);
-    if (disable) {
-      titleInputRef.current?.blur();
-      descTextareaRef.current?.blur();
-    }
-  });
+  
 
   useEffect(() => {
     // eslint-disable-next-line no-console
@@ -266,7 +252,7 @@ export default function CopilotKitPage() {
     }
   }, [state?.items?.length, showJsonView]);
 
-  // No side effects needed; headerOpacity reacts to container scroll via Motion.
+  // CSS scroll-driven animations handle fade and interactivity.
 
   useCoAgentStateRender<AgentState>({
     name: "sample_agent",
@@ -1064,17 +1050,15 @@ export default function CopilotKitPage() {
         </aside>
         {/* Main Content */}
         <main className="relative flex flex-1 h-full">
-          <div ref={scrollAreaRef} className="relative overflow-auto size-full px-4 sm:px-8 md:px-10 py-4">
+          <div className="relative overflow-auto size-full px-4 sm:px-8 md:px-10 py-4">
             <div className={cn(
               "relative mx-auto max-w-7xl h-full min-h-8",
               (showJsonView || (state?.items ?? []).length === 0) && "flex flex-col",
             )}>
               {/* Global Title & Description (hidden in JSON view) */}
               {!showJsonView && (
-                <motion.div style={{ opacity: headerOpacity }} className="sticky top-0 mb-6">
+                <div className="sticky top-0 mb-6 scroll-fade-heading">
                   <input
-                    ref={titleInputRef}
-                    disabled={headerDisabled}
                     value={state?.globalTitle ?? initialState.globalTitle}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setState((prev) => ({ ...(prev ?? initialState), globalTitle: e.target.value }))
@@ -1082,18 +1066,15 @@ export default function CopilotKitPage() {
                     placeholder="Canvas title..."
                     className={cn(titleClasses, "text-2xl font-semibold")}
                   />
-                  <TextareaAutosize
-                    ref={descTextareaRef}
-                    disabled={headerDisabled}
+                  <input
                     value={state?.globalDescription ?? initialState.globalDescription}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setState((prev) => ({ ...(prev ?? initialState), globalDescription: e.target.value }))
                     }
-                    minRows={1}
                     placeholder="Canvas description..."
                     className={cn(titleClasses, "mt-2 text-sm leading-6 resize-none overflow-hidden")}
                   />
-                </motion.div>
+                </div>
               )}
               {(state?.items ?? []).length === 0 ? (
                 <EmptyState className="flex-1">

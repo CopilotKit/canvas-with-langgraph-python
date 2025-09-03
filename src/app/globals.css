@@ -172,3 +172,30 @@ html {
     }
   }
 }
+
+.scroll-fade-heading {
+  animation-name: scroll-fade-heading;
+  animation-timing-function: linear;
+  animation-direction: normal;
+  animation-fill-mode: forwards;
+  animation-timeline: scroll();
+  animation-range: 0px 60px;
+}
+
+@layer base {
+  @keyframes scroll-fade-heading {
+    0% {
+      opacity: 1;
+    }
+    99% {
+      opacity: 0;
+      pointer-events: auto;
+      visibility: visible;
+      translate: 0 5px;
+    }
+    100% {
+      pointer-events: none;
+      visibility: hidden;
+    }
+  }
+}
