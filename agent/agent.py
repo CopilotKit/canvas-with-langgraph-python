@@ -36,6 +36,100 @@ class AgentState(CopilotKitState):
     planStatus: str = ""
     # Optional quotas/budgets for creation set by the agent before execution
     creationTargets: Dict[str, Any] = {}
+
+def _extract_last_created_id(state: AgentState) -> str:
+    try:
+        last = str(state.get("lastAction", ""))
+        if last.startswith("created:"):
+            return last.split(":", 1)[1]
+    except Exception:
+        pass
+    return ""
+
+def compute_quota_status(state: AgentState) -> Dict[str, Any]:
+    """
+    Returns a dict with computed counts and remaining quotas to satisfy creationTargets.
+    Structure: {
+      "remaining": {"items": {type: nRem}, "sub": {"project": {"checklist": nRem, "minCheckedRem": k}, "chart": {"metrics": nRem}}},
+      "guidance": "...human readable..."
+    }
+    """
+    result: Dict[str, Any] = {"remaining": {"items": {}, "sub": {}}, "guidance": ""}
+    targets = state.get("creationTargets", {}) or {}
+    if not isinstance(targets, dict) or (not targets.get("items") and not targets.get("sub")):
+        return result
+    items = state.get("items", []) or []
+    # Items quotas
+    remaining_items: Dict[str, int] = {}
+    try:
+        for t, cap in (targets.get("items", {}) or {}).items():
+            if not isinstance(cap, int) or cap < 0:
+                continue
+            count = sum(1 for it in items if str(it.get("type")) == str(t))
+            rem = max(0, cap - count)
+            if rem > 0:
+                remaining_items[str(t)] = rem
+    except Exception:
+        pass
+    # Sub-quotas (project checklist & chart metrics)
+    remaining_sub: Dict[str, Any] = {}
+    try:
+        last_id = _extract_last_created_id(state)
+        # Project checklist
+        p_t = (targets.get("sub", {}) or {}).get("project", {}) or {}
+        if isinstance(p_t, dict) and ("checklist" in p_t or "minChecked" in p_t):
+            projects = [it for it in items if str(it.get("type")) == "project"]
+            # prefer last created id
+            project = next((it for it in projects if it.get("id") == last_id), None) or (projects[0] if projects else None)
+            if project:
+                data = project.get("data", {}) or {}
+                cl = (data.get("field4", []) or [])
+                need = int(p_t.get("checklist", 0) or 0)
+                if need > 0:
+                    rem = max(0, need - len(cl))
+                    if rem > 0:
+                        remaining_sub.setdefault("project", {})["checklist"] = rem
+                min_checked = int(p_t.get("minChecked", 0) or 0)
+                if min_checked > 0:
+                    have_checked = sum(1 for c in cl if bool(c.get("done")))
+                    remc = max(0, min_checked - have_checked)
+                    if remc > 0:
+                        remaining_sub.setdefault("project", {})["minCheckedRem"] = remc
+        # Chart metrics
+        c_t = (targets.get("sub", {}) or {}).get("chart", {}) or {}
+        if isinstance(c_t, dict) and ("metrics" in c_t):
+            charts = [it for it in items if str(it.get("type")) == "chart"]
+            chart = next((it for it in charts if it.get("id") == last_id), None) or (charts[0] if charts else None)
+            if chart:
+                data = chart.get("data", {}) or {}
+                mets = (data.get("field1", []) or [])
+                needm = int(c_t.get("metrics", 0) or 0)
+                if needm > 0:
+                    remm = max(0, needm - len(mets))
+                    if remm > 0:
+                        remaining_sub.setdefault("chart", {})["metrics"] = remm
+    except Exception:
+        pass
+    result["remaining"]["items"] = remaining_items
+    result["remaining"]["sub"] = remaining_sub
+    # Build guidance
+    lines: list[str] = []
+    if remaining_items:
+        lines.append("ITEM QUOTAS REMAINING:")
+        for t, n in remaining_items.items():
+            lines.append(f"- Create {n} more '{t}' item(s). Reuse existing items if already present.")
+    if remaining_sub:
+        lines.append("SUB-ITEM QUOTAS REMAINING:")
+        pj = remaining_sub.get("project", {}) or {}
+        if "checklist" in pj:
+            lines.append(f"- Add {pj['checklist']} more project checklist item(s) to the target project.")
+        if "minCheckedRem" in pj:
+            lines.append(f"- Mark at least {pj['minCheckedRem']} checklist item(s) as done on the target project.")
+        ch = remaining_sub.get("chart", {}) or {}
+        if "metrics" in ch:
+            lines.append(f"- Add {ch['metrics']} more chart metric(s) to the target chart.")
+    result["guidance"] = "\n".join(lines)
+    return result
 def summarize_items_for_prompt(state: AgentState) -> str:
     try:
         items = state.get("items", []) or []
@@ -328,6 +422,7 @@ async def chat_node(state: AgentState, config: RunnableConfig) -> Command[Litera
             "- If also asked to fill values randomly or with placeholders, populate sensible defaults consistent with FIELD SCHEMA and, for projects/charts, add up to 2 checklist/metric entries using the relevant tools.\n"
             "- When asked to 'add a description' or similar during creation, set the card subtitle via setItemSubtitleOrDescription (do not use data.field1).\n"
             "- Before execution, set exact creation targets using set_creation_targets (e.g., items: {project:1, entity:1, note:1, chart:1}, sub: {project:{checklist:2, minChecked:1}, chart:{metrics:3}}). Respect these exact quotas.\n"
+            "- Before marking a step completed, compute remaining quotas via compute_quota_status logic (read the shared state) and, if non-zero, continue adding/updating until quotas reach zero.\n"
             "- Never create more items or sub-items than the targets. If a retry is needed, update/repair the existing item rather than creating a new one.\n"
             "- To compute remaining quotas, read AgentState.creationTargets and current items; stop creating when the target is reached.\n"
             "STRICT GROUNDING RULES:\n"
