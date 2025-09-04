@@ -297,9 +297,35 @@ export default function CopilotKitPage() {
   }, [state?.items?.length, showJsonView]);
 
   // Prevent sidebar tracker flicker by memoizing derived plan fields
-  const planStepsMemo = (state?.planSteps ?? initialState.planSteps);
-  const planStatusMemo = state?.planStatus ?? initialState.planStatus;
-  const currentStepIndexMemo = typeof state?.currentStepIndex === "number" ? state.currentStepIndex : initialState.currentStepIndex;
+  // Memoized plan state to avoid flicker; only update when shallow-equal differs
+  const planStepsMemo = useRef<PlanStep[]>(initialState.planSteps);
+  const planStatusMemo = useRef<string>(initialState.planStatus);
+  const currentStepIndexMemo = useRef<number>(initialState.currentStepIndex);
+  const shallowEqSteps = (a: PlanStep[], b: PlanStep[]) => {
+    if (a === b) return true;
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      const as = a[i];
+      const bs = b[i];
+      if ((as?.title ?? "") !== (bs?.title ?? "")) return false;
+      if ((as?.status ?? "") !== (bs?.status ?? "")) return false;
+    }
+    return true;
+  };
+  useEffect(() => {
+    const nextSteps = (state?.planSteps ?? initialState.planSteps) as PlanStep[];
+    if (!shallowEqSteps(planStepsMemo.current, nextSteps)) {
+      planStepsMemo.current = nextSteps;
+    }
+    const nextStatus = state?.planStatus ?? initialState.planStatus;
+    if (planStatusMemo.current !== nextStatus) {
+      planStatusMemo.current = nextStatus;
+    }
+    const nextIdx = typeof state?.currentStepIndex === "number" ? state.currentStepIndex : initialState.currentStepIndex;
+    if (currentStepIndexMemo.current !== nextIdx) {
+      currentStepIndexMemo.current = nextIdx;
+    }
+  }, [state?.planSteps, state?.planStatus, state?.currentStepIndex]);
   const prevRunningRef = useRef<boolean>(running);
   const finalSummaryEmittedRef = useRef<string | null>(null);
   const planClearedRef = useRef<boolean>(false);
@@ -1289,9 +1315,9 @@ export default function CopilotKitPage() {
             <AppChatHeader />
             {/* Sidebar Plan Tracker or Completed Summary */}
             {(() => {
-              const steps = (state?.planSteps ?? []) as PlanStep[];
+              const steps = planStepsMemo.current as PlanStep[];
               const count = steps.length;
-              const status = String(state?.planStatus ?? "");
+              const status = String(planStatusMemo.current ?? "");
               if (!Array.isArray(steps) || count === 0 || status === "completed" || status === "failed" || status === "") return null;
               if (status === "completed") {
                 return (
@@ -1333,7 +1359,7 @@ export default function CopilotKitPage() {
                     <ol className="space-y-1">
                       {steps.map((s, i) => {
                         const st = String(s?.status ?? "pending").toLowerCase();
-                        const isActive = typeof state?.currentStepIndex === "number" && state.currentStepIndex === i && st === "in_progress";
+                        const isActive = typeof currentStepIndexMemo.current === "number" && currentStepIndexMemo.current === i && st === "in_progress";
                         const isDone = st === "completed";
                         const isFailed = st === "failed";
                         return (
