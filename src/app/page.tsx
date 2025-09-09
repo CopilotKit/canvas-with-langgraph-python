@@ -45,11 +45,6 @@ interface ChecklistItem {
   proposed: boolean;
 }
 
-interface LinkItem {
-  title: string;
-  url: string;
-}
-
 type CardType = "project" | "entity" | "note" | "chart";
 
 interface ProjectData {
@@ -247,7 +242,7 @@ function PopupHeader({}: HeaderProps) {
 }
 
 export default function CopilotKitPage() {
-  const { state, setState, running, run } = useCoAgent<AgentState>({
+  const { state, setState } = useCoAgent<AgentState>({
     name: "sample_agent",
     initialState,
   });
@@ -288,7 +283,7 @@ export default function CopilotKitPage() {
       createdByTypeRef.current = {};
     }
     prevPlanStatusRef.current = status;
-  }, [state?.planStatus]);
+  }, [viewState?.planStatus]);
 
   useMotionValueEvent(scrollY, "change", (y) => {
     const disable = y >= headerScrollThreshold;
@@ -300,17 +295,17 @@ export default function CopilotKitPage() {
   });
 
   useEffect(() => {
-    // eslint-disable-next-line no-console
     console.log("[CoAgent state updated]", state);
-  }, [JSON.stringify(state)]);
+  }, [state]);
 
   // Reset JSON view when there are no items
   useEffect(() => {
-    const itemsCount = (viewState?.items ?? []).length;
+    const items = viewState?.items ?? [];
+    const itemsCount = items.length;
     if (itemsCount === 0 && showJsonView) {
       setShowJsonView(false);
     }
-  }, [state?.items?.length, showJsonView]);
+  }, [viewState?.items, showJsonView]);
 
   // Use cached viewState to derive plan-related fields
   const planStepsMemo = (viewState?.planSteps ?? initialState.planSteps) as PlanStep[];
@@ -370,26 +365,13 @@ export default function CopilotKitPage() {
   // Modern JS does respect insertion order of JS objects, so we can show the keys in a sensible order in the JSON preview
   const getStatePreviewJSON = (s: AgentState | undefined): Record<string, unknown> => {
     const snapshot = (s ?? initialState) as AgentState;
-    const { globalTitle, globalDescription, items, ...rest } = snapshot;
+    const { globalTitle, globalDescription, items } = snapshot;
     return {
       globalTitle: globalTitle ?? initialState.globalTitle,
       globalDescription: globalDescription ?? initialState.globalDescription,
       items: items ?? initialState.items,
     };
   };
-
-  /* useCoAgentStateRender<AgentState>({
-    name: "sample_agent",
-    render: ({ state }) => {
-      return (
-        <pre className="whitespace-pre-wrap text-xs text-violet-600 font-mono w-full overflow-hidden">
-          {JSON.stringify(getStatePreviewJSON(viewState), null, 2)}
-        </pre>
-      );
-    },
-  }); */
-
-  // Removed chat hook render; we'll display plan tracker inline in the sidebar header below
 
   // Strengthen grounding: always prefer shared state over chat history
   useCopilotAdditionalInstructions({
@@ -471,7 +453,7 @@ export default function CopilotKitPage() {
       return (
         <div className="rounded-md border bg-white p-4 text-sm shadow">
           <p className="mb-2 font-medium">Select an item</p>
-          <p className="mb-3 text-xs text-gray-600">{(event?.value as any)?.content ?? "Which item should I use?"}</p>
+          <p className="mb-3 text-xs text-gray-600">{(event?.value as { content?: string } | undefined)?.content ?? "Which item should I use?"}</p>
           <select
             className="w-full rounded border px-2 py-1"
             defaultValue={selectedId}
@@ -524,7 +506,7 @@ export default function CopilotKitPage() {
       return (
         <div className="rounded-md border bg-white p-4 text-sm shadow">
           <p className="mb-2 font-medium">Select a card type</p>
-          <p className="mb-3 text-xs text-gray-600">{(event?.value as any)?.content ?? "Which type of card should I create?"}</p>
+          <p className="mb-3 text-xs text-gray-600">{(event?.value as { content?: string } | undefined)?.content ?? "Which type of card should I create?"}</p>
           <select
             className="w-full rounded border px-2 py-1"
             defaultValue=""
@@ -589,11 +571,11 @@ export default function CopilotKitPage() {
 
   const toggleTag = useCallback((itemId: string, tag: string) => {
     updateItemData(itemId, (prev) => {
-      const anyPrev = prev as any;
-      if (Array.isArray(anyPrev.field3)) {
-        const selected = new Set<string>(anyPrev.field3 ?? []);
+      const entity = prev as EntityData;
+      if (Array.isArray(entity.field3)) {
+        const selected = new Set<string>(entity.field3 ?? []);
         if (selected.has(tag)) selected.delete(tag); else selected.add(tag);
-        return { ...anyPrev, field3: Array.from(selected) } as ItemData;
+        return { ...entity, field3: Array.from(selected) } as EntityData;
       }
       return prev;
     });
@@ -795,9 +777,9 @@ export default function CopilotKitPage() {
     handler: ({ value, itemId }: { value: string; itemId: string }) => {
       const safeValue = String((value as unknown as string) ?? "");
       updateItemData(itemId, (prev) => {
-        const anyPrev = prev as any;
-        if (typeof anyPrev.field1 === "string") {
-          return { ...anyPrev, field1: safeValue } as ItemData;
+        const project = prev as ProjectData;
+        if (typeof project.field1 === "string") {
+          return { ...project, field1: safeValue } as ProjectData;
         }
         return prev;
       });
@@ -816,9 +798,9 @@ export default function CopilotKitPage() {
     handler: ({ value, itemId }: { value: string; itemId: string }) => {
       const safeValue = String((value as unknown as string) ?? "");
       updateItemData(itemId, (prev) => {
-        const anyPrev = prev as any;
-        if (typeof anyPrev.field2 === "string") {
-          return { ...anyPrev, field2: safeValue } as ItemData;
+        const project = prev as ProjectData;
+        if (typeof project.field2 === "string") {
+          return { ...project, field2: safeValue } as ProjectData;
         }
         return prev;
       });
@@ -835,7 +817,8 @@ export default function CopilotKitPage() {
     ],
     handler: (args: { date?: string; itemId: string } & Record<string, unknown>) => {
       const itemId = String(args.itemId);
-      const rawInput = (args as any).date ?? (args as any).value ?? (args as any).val ?? (args as any).text;
+      const dictArgs = args as Record<string, unknown>;
+      const rawInput = (dictArgs["date"]) ?? (dictArgs["value"]) ?? (dictArgs["val"]) ?? (dictArgs["text"]);
       const normalizeDate = (input: unknown): string | null => {
         if (input == null) return null;
         if (input instanceof Date && !isNaN(input.getTime())) {
@@ -859,9 +842,9 @@ export default function CopilotKitPage() {
       const normalized = normalizeDate(rawInput);
       if (!normalized) return;
       updateItemData(itemId, (prev) => {
-        const anyPrev = prev as any;
-        if (typeof anyPrev.field3 === "string") {
-          return { ...anyPrev, field3: normalized } as ItemData;
+        const anyPrev = prev as ProjectData | EntityData | NoteData | ChartData;
+        if (typeof (anyPrev as ProjectData).field3 === "string") {
+          return { ...(anyPrev as ProjectData), field3: normalized } as ItemData;
         }
         return prev;
       });
@@ -878,9 +861,9 @@ export default function CopilotKitPage() {
     ],
     handler: ({ itemId }: { itemId: string }) => {
       updateItemData(itemId, (prev) => {
-        const anyPrev = prev as any;
-        if (typeof anyPrev.field3 === "string") {
-          return { ...anyPrev, field3: "" } as ItemData;
+        const project = prev as ProjectData;
+        if (typeof project.field3 === "string") {
+          return { ...project, field3: "" } as ProjectData;
         }
         return prev;
       });
@@ -933,9 +916,9 @@ export default function CopilotKitPage() {
       { name: "text", type: "string", required: false, description: "New text (optional)." },
       { name: "done", type: "boolean", required: false, description: "Done status (optional)." },
     ],
-    handler: (args: any) => {
+    handler: (args: { itemId?: string; checklistItemId?: string; id?: string | number; index?: string | number; text?: string; done?: boolean | string }) => {
       const itemId = String(args.itemId ?? "");
-      let target = args.checklistItemId ?? args.id ?? args.index;
+      const target = args.checklistItemId ?? args.id ?? args.index;
       let targetId = target != null ? String(target) : "";
       const maybeDone = args.done;
       const text: string | undefined = args.text != null ? String(args.text) : undefined;
@@ -991,9 +974,9 @@ export default function CopilotKitPage() {
     ],
     handler: ({ value, itemId }: { value: string; itemId: string }) => {
       updateItemData(itemId, (prev) => {
-        const anyPrev = prev as any;
-        if (typeof anyPrev.field1 === "string") {
-          return { ...anyPrev, field1: value } as ItemData;
+        const entity = prev as EntityData;
+        if (typeof entity.field1 === "string") {
+          return { ...entity, field1: value } as EntityData;
         }
         return prev;
       });
@@ -1010,9 +993,9 @@ export default function CopilotKitPage() {
     ],
     handler: ({ value, itemId }: { value: string; itemId: string }) => {
       updateItemData(itemId, (prev) => {
-        const anyPrev = prev as any;
-        if (typeof anyPrev.field2 === "string") {
-          return { ...anyPrev, field2: value } as ItemData;
+        const entity = prev as EntityData;
+        if (typeof entity.field2 === "string") {
+          return { ...entity, field2: value } as EntityData;
         }
         return prev;
       });
@@ -1409,7 +1392,7 @@ export default function CopilotKitPage() {
                             description={""}
                             onNameChange={(v) => updateItem(item.id, { name: v })}
                             onSubtitleChange={(v) => updateItem(item.id, { subtitle: v })}
-                            onDescriptionChange={(v) => updateItemData(item.id, (prev) => prev)}
+                            onDescriptionChange={() => {}}
                           />
 
                           <div className="mt-6">
@@ -1501,7 +1484,7 @@ function ItemHeader(props: {
   onNameCommit?: (value: string) => void;
   onDescriptionCommit?: (value: string) => void;
 }) {
-  const { id, name, subtitle, description, onNameChange, onSubtitleChange, onDescriptionChange, onNameCommit, onDescriptionCommit } = props;
+  const { id, name, subtitle, onNameChange, onSubtitleChange, onNameCommit } = props;
   return (
     <div className="mb-4">
       <div className="mb-2">
@@ -1755,120 +1738,6 @@ function CardRenderer(props: {
           })}
         </div>
       </div>
-    </div>
-  );
-}
-
-function Select<T extends string>(props: {
-  label: string;
-  value: T;
-  options: readonly T[] | string[];
-  onChange: (value: T) => void;
-}) {
-  const { label, value, options, onChange } = props;
-  return (
-    <div className="flex h-9 items-center gap-1 rounded-md border px-2">
-      <span className="text-[11px] text-gray-500">{label}</span>
-      <select
-        value={value}
-        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value as T)}
-        className="h-7 appearance-none bg-transparent pl-1 pr-4 text-sm outline-none"
-      >
-        {options.map((opt) => (
-          <option key={String(opt)} value={String(opt)}>
-            {String(opt)}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function TagEditor(props: { tags: string[]; onAdd: (tag: string) => void; onRemove: (tag: string) => void }) {
-  const { tags, onAdd, onRemove } = props;
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      onAdd((e.target as HTMLInputElement).value);
-      (e.target as HTMLInputElement).value = "";
-    }
-  };
-  return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border p-2">
-      {tags.map((t: string) => (
-        <span key={t} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs">
-          {t}
-          <button className="text-gray-500" onClick={() => onRemove(t)} aria-label={`Remove ${t}`}>
-            ×
-          </button>
-        </span>
-      ))}
-      <input
-        onKeyDown={handleKeyDown}
-        placeholder="Add tag and press Enter"
-        className="min-w-32 flex-1 rounded-md px-1 text-sm outline-none"
-      />
-    </div>
-  );
-}
-
-function AddChecklistInput(props: { onAdd: (text: string) => void }) {
-  const { onAdd } = props;
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      onAdd((e.target as HTMLInputElement).value);
-      (e.target as HTMLInputElement).value = "";
-    }
-  };
-  return (
-    <input
-      onKeyDown={onKeyDown}
-      placeholder="+ Add item and press Enter"
-      className="w-full rounded-md border px-2 py-1 text-sm outline-none"
-    />
-  );
-}
-
-function LinkList(props: {
-  links: LinkItem[];
-  onChange: (next: LinkItem[]) => void;
-}) {
-  const { links, onChange } = props;
-
-  const add = () => {
-    const title = window.prompt("Link title");
-    const url = window.prompt("Link URL (https://…)");
-    if (!title || !url) return;
-    try {
-      // basic validation
-      // eslint-disable-next-line no-new
-      new URL(url);
-      onChange([...links, { title, url }]);
-    } catch {
-      // ignore invalid URL
-    }
-  };
-
-  const removeAt = (idx: number) => {
-    const next = links.slice(0, idx).concat(links.slice(idx + 1));
-    onChange(next);
-  };
-
-  return (
-    <div className="space-y-2">
-      {links.length === 0 && <p className="text-xs text-gray-500">No links yet.</p>}
-      {links.map((l, i) => (
-        <div key={`${l.title}-${i}`} className="flex items-center justify-between gap-2 rounded-md border p-2">
-          <a href={l.url} target="_blank" rel="noreferrer" className="truncate text-sm text-blue-600 underline">
-            {l.title}
-          </a>
-          <button onClick={() => removeAt(i)} className="rounded-md border px-2 py-1 text-xs text-gray-600 hover:bg-gray-50">
-            Remove
-          </button>
-        </div>
-      ))}
-      <button onClick={add} className="rounded-md border px-3 py-1 text-xs text-gray-700 hover:bg-gray-50">
-        + Add link
-      </button>
     </div>
   );
 }
