@@ -56,6 +56,38 @@ bun run dev
 ```
 
 This will start both the UI and agent servers concurrently.
+## Deploying on Vercel (Web + Python Agent)
+
+This project is configured to deploy both the Next.js web app and the Python agent on Vercel using the Python Runtime [docs](https://vercel.com/docs/functions/runtimes/python.md).
+
+Key points:
+
+- The Python agent is exposed via a Vercel Function at `api/langgraph.py` implementing:
+  - `POST /api/langgraph/graphs/sample_agent/invoke`
+  - `POST /api/langgraph/graphs/sample_agent/stream`
+- The frontend uses `@ag-ui/langgraph` with `deploymentUrl` auto-pointing to `/api/langgraph` when `VERCEL=1`.
+- Python dependencies are in root `requirements.txt` (mirrored in `Pipfile`).
+- Python version is pinned to 3.12 via `Pipfile` per Vercel guidance; also set Node 20.x or 22.x in Vercel Project Settings.
+- Node.js engines are set to `^20 || ^22` in `package.json` as recommended when using Python 3.12.
+
+### Environment Variables
+
+Set the following in your Vercel Project Settings:
+
+- `OPENAI_API_KEY` (Required)
+  (LangSmith not required.)
+
+No need to set `LANGGRAPH_DEPLOYMENT_URL` on Vercel — it defaults to the internal function.
+
+### Local Development vs Vercel
+
+- Local development runs the LangGraph CLI on `http://localhost:8123`.
+- On Vercel, the agent endpoints are served by the Python function under `/api/langgraph`.
+
+### Notes
+
+- We skip Python venv bootstrap on Vercel during `postinstall` to avoid nested environments.
+- The Python function returns Server-Sent Events for `/stream` to support live updates.
 
 ## Available Scripts
 The following scripts can also be run using your preferred package manager:

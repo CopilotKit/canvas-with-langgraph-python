@@ -16,9 +16,10 @@ const serviceAdapter = new ExperimentalEmptyAdapter();
 const runtime = new CopilotRuntime({
   agents: {
     "sample_agent": new LangGraphAgent({
-      deploymentUrl: process.env.LANGGRAPH_DEPLOYMENT_URL || "http://localhost:8123",
+      // When deployed on Vercel, our Python agent runs as a Vercel Function
+      // at /api/langgraph (Python runtime). In local dev, default to the CLI.
+      deploymentUrl: process.env.LANGGRAPH_DEPLOYMENT_URL || (process.env.VERCEL ? "/api/langgraph" : "http://localhost:8123"),
       graphId: "sample_agent",
-      langsmithApiKey: process.env.LANGSMITH_API_KEY || "",
     }),
   }
 });

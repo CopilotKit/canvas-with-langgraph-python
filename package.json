@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "next lint",
     "install:agent": "sh ./scripts/setup-agent.sh || scripts/setup-agent.bat",
-    "postinstall": "npm run install:agent"
+    "postinstall": "if [ \"$VERCEL\" = \"1\" ]; then echo 'Skipping agent venv setup on Vercel'; else npm run install:agent; fi"
   },
   "dependencies": {
     "@ag-ui/langgraph": "0.0.7",
@@ -53,5 +53,14 @@
     "geist": "^1.4.2",
     "tailwindcss": "^4.1.12",
     "typescript": "^5.9.2"
+  }
+  ,
+  "engines": {
+    "node": "^20 || ^22"
+  },
+  "pnpm": {
+    "overrides": {
+      "@ag-ui/client": "0.0.36"
+    }
   }
 }
