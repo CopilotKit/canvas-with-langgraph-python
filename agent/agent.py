@@ -3,8 +3,7 @@ This is the main entry point for the agent.
 It defines the workflow graph, state, tools, nodes and edges.
 """
 
-from typing import Any, List, Optional, Dict
-from typing_extensions import Literal
+from typing import Any, List, Optional, Dict, Literal
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
