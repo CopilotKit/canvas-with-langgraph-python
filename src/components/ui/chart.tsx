@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
+import type { TooltipContentProps as RechartsTooltipContentProps } from "recharts"
 
 import { cn } from "@/lib/utils"
 
@@ -118,13 +119,22 @@ function ChartTooltipContent({
   color,
   nameKey,
   labelKey,
-}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
+}: Omit<RechartsTooltipContentProps<number | string, string>, "content"> &
   React.ComponentProps<"div"> & {
     hideLabel?: boolean
     hideIndicator?: boolean
     indicator?: "line" | "dot" | "dashed"
     nameKey?: string
     labelKey?: string
+    color?: string
+    labelClassName?: string
+    formatter?: (
+      value: number | string,
+      name: string,
+      item: NonNullable<RechartsTooltipContentProps<number | string, string>["payload"]>[number],
+      index: number,
+      rawPayload: unknown
+    ) => React.ReactNode
   }) {
   const { config } = useChart()
 
@@ -257,7 +267,9 @@ function ChartLegendContent({
   verticalAlign = "bottom",
   nameKey,
 }: React.ComponentProps<"div"> &
-  Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
+  {
+    payload?: ReadonlyArray<RechartsPrimitive.LegendPayload>
+    verticalAlign?: "top" | "bottom" | "middle"
     hideIcon?: boolean
     nameKey?: string
   }) {
