@@ -10,7 +10,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain.tools import tool
 from langgraph.graph import StateGraph, END
 from langgraph.types import Command
-from copilotkit_state import CopilotKitState
+from copilotkit import CopilotKitState
 from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
 

@@ -7,3 +7,4 @@ uvicorn>=0.29.0,<1.0.0
 python-dotenv>=1.0.0,<2.0.0 
 langgraph-cli[inmem]>=0.3.5
 langchain-openai>=0.0.1
+typing_extensions>=4.9.0,<5.0.0
