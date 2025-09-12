@@ -11,5 +11,5 @@ fi
 # Activate the virtual environment
 source .venv/bin/activate
 
-# Install requirements using pip3 or pip
-(pip3 install -r requirements.txt || pip install -r requirements.txt)
+# Install the agent as an editable project
+(pip3 install -e . || pip install -e .)

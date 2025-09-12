@@ -10,5 +10,5 @@ if not exist ".venv" (
 REM Activate the virtual environment
 call .venv\Scripts\activate.bat
 
-REM Install requirements using pip
-pip install -r requirements.txt 
+REM Install the agent as an editable project
+pip install -e .

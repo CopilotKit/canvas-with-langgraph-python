@@ -107,11 +107,11 @@ npm install:agent
 ### Dependency Conflicts
 If you see dependency conflict errors (e.g., with packages like `guardrails-ai`), the agent uses an isolated virtual environment that should resolve most conflicts automatically.
 
-If issues persist, delete and recreate the virtual environment, then reinstall the requirements.txt:
+If issues persist, delete and recreate the virtual environment, then reinstall the agent project:
 ```bash
 cd agent
 rm -rf .venv
 python -m venv .venv --clear
 .venv/bin/pip install --upgrade pip
-.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -e .
 ```
