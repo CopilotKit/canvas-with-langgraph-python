@@ -220,7 +220,16 @@ export default function CopilotKitPage() {
   useLangGraphInterrupt({
     enabled: ({ eventValue }) => {
       try {
-        return typeof eventValue === "object" && eventValue?.type === "choose_item";
+        // Parse the eventValue if it's a string
+        let parsedValue = eventValue;
+        if (typeof eventValue === "string") {
+          try {
+            parsedValue = JSON.parse(eventValue);
+          } catch {
+            return false;
+          }
+        }
+        return typeof parsedValue === "object" && parsedValue?.type === "choose_item";
       } catch {
         return false;
       }
@@ -241,10 +250,21 @@ export default function CopilotKitPage() {
         );
       }
       let selectedId = items[0].id;
+      
+      // Parse the event value if it's a string
+      let eventData = event?.value;
+      if (typeof eventData === "string") {
+        try {
+          eventData = JSON.parse(eventData);
+        } catch {
+          eventData = {};
+        }
+      }
+      
       return (
         <div className="rounded-md border bg-white p-4 text-sm shadow">
           <p className="mb-2 font-medium">Select an item</p>
-          <p className="mb-3 text-xs text-gray-600">{(event?.value as { content?: string })?.content ?? "Which item should I use?"}</p>
+          <p className="mb-3 text-xs text-gray-600">{eventData?.content ?? "Which item should I use?"}</p>
           <select
             className="w-full rounded border px-2 py-1"
             defaultValue={selectedId}
@@ -281,7 +301,16 @@ export default function CopilotKitPage() {
   useLangGraphInterrupt({
     enabled: ({ eventValue }) => {
       try {
-        return typeof eventValue === "object" && eventValue?.type === "choose_card_type";
+        // Parse the eventValue if it's a string
+        let parsedValue = eventValue;
+        if (typeof eventValue === "string") {
+          try {
+            parsedValue = JSON.parse(eventValue);
+          } catch {
+            return false;
+          }
+        }
+        return typeof parsedValue === "object" && parsedValue?.type === "choose_card_type";
       } catch {
         return false;
       }
@@ -294,10 +323,21 @@ export default function CopilotKitPage() {
         { id: "chart", label: "Chart" },
       ];
       let selected: CardType | "" = "";
+      
+      // Parse the event value if it's a string
+      let eventData = event?.value;
+      if (typeof eventData === "string") {
+        try {
+          eventData = JSON.parse(eventData);
+        } catch {
+          eventData = {};
+        }
+      }
+      
       return (
         <div className="rounded-md border bg-white p-4 text-sm shadow">
           <p className="mb-2 font-medium">Select a card type</p>
-          <p className="mb-3 text-xs text-gray-600">{(event?.value as { content?: string })?.content ?? "Which type of card should I create?"}</p>
+          <p className="mb-3 text-xs text-gray-600">{eventData?.content ?? "Which type of card should I create?"}</p>
           <select
             className="w-full rounded border px-2 py-1"
             defaultValue=""

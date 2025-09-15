@@ -16,6 +16,7 @@ if 'langgraph.graph.graph' not in sys.modules:
     _mock_graph_module.CompiledGraph = CompiledStateGraph
     sys.modules['langgraph.graph.graph'] = _mock_graph_module
 import json
+import uuid
 from typing import Any, List, Optional, Dict
 from typing_extensions import Literal
 from langchain_openai import ChatOpenAI
@@ -415,14 +416,20 @@ PLANNING:
         if last_user and any(k in last_user.content.lower() for k in ["item", "rename", "update", "modify", "change", "edit"]) and not any(k in last_user.content.lower() for k in ["id=", "item id", "0001", "0002", "0003", "0004"]):
             items = state.get("items", [])
             if len(items) > 1:  # Only interrupt if there are multiple items to choose from
-                result = copilotkit_interrupt(
-                    message=json.dumps({
-                        "type": "choose_item",
-                        "content": "Please choose which item you mean.",
-                    })
-                )
-                if result and result.get("answer"):
-                    state["chosen_item_id"] = result["answer"]
+                # Pass the interrupt value as a dict, not a JSON string
+                interrupt_value = {
+                    "type": "choose_item",
+                    "content": "Please choose which item you mean.",
+                }
+                response = interrupt({
+                    "__copilotkit_interrupt_value__": interrupt_value,
+                    "__copilotkit_messages__": [AIMessage(content="", id=str(uuid.uuid4()))],
+                })
+                # Extract the answer from the response
+                if response and len(response) > 0:
+                    answer = response[-1].content
+                    if answer:
+                        state["chosen_item_id"] = answer
     except Exception:
         pass
 
@@ -430,15 +437,21 @@ PLANNING:
     try:
         last_user = next((m for m in reversed(state["messages"]) if getattr(m, "type", "") == "human"), None)
         if last_user and any(k in last_user.content.lower() for k in ["create", "add", "new"]) and any(k in last_user.content.lower() for k in ["item", "card"]) and not any(k in last_user.content.lower() for k in ["project", "entity", "note", "chart"]):
-            result = copilotkit_interrupt(
-                message=json.dumps({
-                    "type": "choose_card_type",
-                    "content": "Which type of card should I create?",
-                })
-            )
-            if result and result.get("answer"):
-                # Append a clarifying message to guide the model
-                state["messages"].append(HumanMessage(content=f"Create a {result['answer']} item."))
+            # Pass the interrupt value as a dict, not a JSON string
+            interrupt_value = {
+                "type": "choose_card_type",
+                "content": "Which type of card should I create?",
+            }
+            response = interrupt({
+                "__copilotkit_interrupt_value__": interrupt_value,
+                "__copilotkit_messages__": [AIMessage(content="", id=str(uuid.uuid4()))],
+            })
+            # Extract the answer from the response
+            if response and len(response) > 0:
+                answer = response[-1].content
+                if answer:
+                    # Append a clarifying message to guide the model
+                    state["messages"].append(HumanMessage(content=f"Create a {answer} item."))
     except Exception:
         pass
 
