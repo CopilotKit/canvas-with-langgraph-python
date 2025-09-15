@@ -101,32 +101,32 @@ export default function CopilotKitPage() {
       if (status !== "completed" && status !== "failed") return null;
       const count = steps.length;
       return (
-        <div className="my-2 w-full">
-          <Accordion type="single" collapsible defaultValue="done">
-            <AccordionItem value="done">
-              <AccordionTrigger className="text-xs">
+        <div className="mt-1 mb-2 w-full">
+          <Accordion type="single" collapsible>
+            <AccordionItem value="done" className="border-none">
+              <AccordionTrigger className="text-xs py-1 hover:no-underline">
                 <span className="inline-flex items-center gap-2">
                   <Check className={cn("h-4 w-4", status === "completed" ? "text-green-600" : "text-red-600")} />
                   <span className="font-medium">{count} steps {status}</span>
                 </span>
               </AccordionTrigger>
-              <AccordionContent>
-                <div className="rounded-2xl border shadow-sm bg-card p-4">
-                  <div className="mb-2 text-xs font-semibold">Plan <span className={cn("ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium border", status === "completed" ? "text-green-700 border-green-300 bg-green-50" : "text-red-700 border-red-300 bg-red-50")}>{status}</span></div>
-                  <ol className="space-y-1">
+              <AccordionContent className="pt-1 pb-0">
+                <div className="rounded-xl border bg-card p-3">
+                  <div className="mb-1 text-xs font-semibold">Plan <span className={cn("ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium border", status === "completed" ? "text-green-700 border-green-300 bg-green-50" : "text-red-700 border-red-300 bg-red-50")}>{status}</span></div>
+                  <ol className="space-y-0.5">
                     {steps.map((s, i) => (
                       <li key={`${s.title ?? "step"}-${i}`} className="flex items-start gap-2">
                         <span className="mt-0.5 inline-flex h-4 w-4 items-center justify-center">
                           {String(s.status).toLowerCase() === "completed" ? (
-                            <Check className="h-4 w-4 text-green-600" />
+                            <Check className="h-3 w-3 text-green-600" />
                           ) : String(s.status).toLowerCase() === "failed" ? (
-                            <X className="h-4 w-4 text-red-600" />
+                            <X className="h-3 w-3 text-red-600" />
                           ) : (
-                            <span className="block h-2 w-2 rounded-full bg-gray-300" />
+                            <span className="block h-1.5 w-1.5 rounded-full bg-gray-300" />
                           )}
                         </span>
                         <div className="flex-1 text-xs">
-                          <div className={cn("leading-5", String(s.status).toLowerCase() === "completed" && "text-green-700", String(s.status).toLowerCase() === "failed" && "text-red-700")}>{s.title ?? `Step ${i + 1}`}</div>
+                          <div className={cn("leading-4", String(s.status).toLowerCase() === "completed" && "text-green-700", String(s.status).toLowerCase() === "failed" && "text-red-700")}>{s.title ?? `Step ${i + 1}`}</div>
                         </div>
                       </li>
                     ))}
