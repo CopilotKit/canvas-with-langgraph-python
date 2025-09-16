@@ -194,7 +194,7 @@ async def chat_node(state: AgentState, config: RunnableConfig) -> Command[Litera
     """
 
     # 1. Define the model
-    model = ChatOpenAI(model="gpt-4o")
+    model = ChatOpenAI(model="gpt-4o-mini")
 
     # 2. Prepare and bind tools to the model (dedupe, allowlist, and cap)
     def _extract_tool_name(tool: Any) -> Optional[str]:

@@ -119,7 +119,7 @@ graph TB
         Agent[LangGraph Agent<br/>agent.py]
         Tools[Backend Tools<br/>- setPlan<br/>- updatePlanProgress<br/>- completePlan]
         AgentState[AgentState<br/>CopilotKitState]
-        Model[LLM<br/>GPT-4o]
+        Model[LLM<br/>GPT-4o-mini]
     end
     
     subgraph "Communication"
@@ -179,7 +179,7 @@ sequenceDiagram
     User->>UI: Interact with canvas
     UI->>CK: Update state via useCoAgent
     CK->>Agent: Send state + message
-    Agent->>Agent: Process with GPT-4o
+    Agent->>Agent: Process with GPT-4o-mini
     Agent->>Tools: Execute tools
     Tools-->>Agent: Return results
     Agent->>CK: Return updated state
